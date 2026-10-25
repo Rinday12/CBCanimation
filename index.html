@@ -129,11 +129,12 @@
   form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
   form .full { grid-column: 1 / -1; }
   label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-  input {
+  input, select {
     width: 100%; padding: 10px 12px; border-radius: 10px;
     border: 1px solid var(--border); background: var(--panel2); color: var(--text);
     font-family: var(--mono); font-size: 14px;
   }
+  select { appearance: auto; }
   input:focus { outline: none; border-color: var(--accent); }
   .btn {
     margin-top: 14px; width: 100%; padding: 12px; cursor: pointer;
@@ -212,8 +213,11 @@
         <input id="inKey" value="R" maxlength="1" />
       </div>
       <div>
-        <label>IV (contoh: 11 / 00 — 1 byte)</label>
-        <input id="inIV" value="11" />
+        <label>IV (pilih: 11111111 atau 00000000)</label>
+        <select id="inIV">
+          <option value="11">11111111 (0x11)</option>
+          <option value="00">00000000 (0x00)</option>
+        </select>
       </div>
       <div>
         <label>Plaintext (kalimat bebas)</label>
@@ -224,7 +228,7 @@
         <p class="hint">
           <b>Blok = 8 bit (1 byte)</b> sesuai pengajaran kriptografi dasar.<br>
           <b>Key</b> = cukup <b>1 huruf</b> (mis. <em>R</em>) → kode ASCII menjadi kunci 8‑bit (1 byte).<br>
-          <b>IV</b> = 1 byte, contoh <code>11</code> (hex) atau <code>00</code> → menjadi C₀ (1 blok 8‑bit).<br>
+          <b>IV</b> = pilih dari dropdown: <code>11111111</code> atau <code>00000000</code> → menjadi C₀.<br>
           <b>Plaintext</b> = setiap karakter = 1 blok 8‑bit. Maks 6 blok ditampilkan.
         </p>
       </div>
