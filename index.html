@@ -215,8 +215,8 @@
       <div>
         <label>IV (pilih: 11111111 atau 00000000)</label>
         <select id="inIV">
-          <option value="11">11111111 (0x11)</option>
-          <option value="00">00000000 (0x00)</option>
+          <option value="1">11111111 (0xFF, nilai 255)</option>
+          <option value="0">00000000 (0x00, nilai 0)</option>
         </select>
       </div>
       <div>
@@ -344,9 +344,10 @@ function decryptBlock(e, K){ return e ^ K; }
 // ================== HITUNG CBC ==================
 function computeCBC(key, iv, pt){
   const K = key.length > 0 ? key.charCodeAt(0) : 0;
-  let ivHex = iv.toLowerCase().replace(/[^0-9a-f]/g,'');
-  ivHex = (ivHex || '00').padStart(2,'0').slice(0,2);
-  const IV = parseInt(ivHex, 16);
+  // iv sekarang nilai "1" (semua bit 1) atau "0" (semua bit 0)
+  const IV = iv === '1' ? 0xFF : 0x00;
+  const ivBin = iv === '1' ? '11111111' : '00000000';
+  const ivHex = ivBin === '11111111' ? 'FF' : '00';
 
   let padded = pt;
   padded = padded.slice(0, 5) + String.fromCharCode(1); // PKCS7 pad 1 byte
@@ -368,14 +369,14 @@ function computeCBC(key, iv, pt){
     });
     prev = cVal;
   }
-  return { K, ivHex, IV, steps, cipherHex: steps.map(s => s.cHex) };
+  return { K, ivBin, ivHex, IV, steps, cipherHex: steps.map(s => s.cHex) };
 }
 
 // ================== RENDER ==================
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function renderAll(key, iv, pt){
-  const { K, ivHex, IV, steps, cipherHex } = computeCBC(key, iv, pt);
+  const { K, ivBin, ivHex, IV, steps, cipherHex } = computeCBC(key, iv, pt);
   const isLast = steps.length - 1;
 
   // ---- Setup ----
@@ -383,7 +384,7 @@ function renderAll(key, iv, pt){
     '<span class="k">Key (input)</span> = "' + esc(key) + '"  <span style="color:var(--muted)">(1 huruf)</span><br>' +
     '<span class="k">Kunci K</span>   = <span class="k">' + toHex(K) + '</span>  ' +
     '<span style="color:var(--muted)">→ kode ASCII "' + esc(key[0]||'') + '" = ' + K + ' (biner ' + b8(K) + ')</span><br>' +
-    '<span style="color:var(--iv)">IV</span> = "' + esc(iv) + '"  →  <span class="iv">' + ivHex + '</span>  ' +
+    '<span style="color:var(--iv)">IV</span> = "' + esc(ivBin) + '"  →  <span class="iv">' + ivHex + '</span>  ' +
     '<span style="color:var(--muted)">= C₀ (1 blok 8‑bit, nilai ' + IV + ')</span>';
 
   // ---- Diagram Enkripsi ----
@@ -392,7 +393,7 @@ function renderAll(key, iv, pt){
     const n = i + 1;
     const isIv = (i === 0);
     const prevLabel = isIv ? 'P₁ ⊕ IV' : 'P_' + n + ' ⊕ C_' + n;
-    const prevVal   = isIv ? 'IV = ' + ivHex + ' (=' + IV + ')' : 'C_' + n + ' = ' + s.prevHex + ' (=' + s.prev + ')';
+    const prevVal   = isIv ? 'IV = ' + ivBin + ' (' + ivHex + ', nilai ' + IV + ')' : 'C_' + n + ' = ' + s.prevHex + ' (=' + s.prev + ')';
     encHtml += '<div class="cbccol" data-stage="' + n + '">' +
       '<div class="cbx pt"><div class="cbx-h">P_' + n + '</div><div class="cbx-v">' + esc(s.p) + ' <span style="color:var(--muted)">= ' + s.pHex + '</span></div><div class="cbx-t">' + b8(s.pVal) + '</div></div>' +
       '<div class="cb-arr">↓</div>' +
@@ -422,7 +423,7 @@ function renderAll(key, iv, pt){
     const n = i + 1;
     const isIv = (i === 0);
     const xorLabel = isIv ? 'D_K(C₁) ⊕ IV' : 'D_K(C_' + n + ') ⊕ C_' + n;
-    const xorVal   = isIv ? 'IV = ' + ivHex + ' (' + IV + ')' : 'C_' + n + ' = ' + s.prevHex;
+    const xorVal   = isIv ? 'IV = ' + ivBin + ' (' + ivHex + ', nilai ' + IV + ')' : 'C_' + n + ' = ' + s.prevHex;
     decHtml += '<div class="cbccol" data-stage="' + n + '">' +
       '<div class="cbx ct"><div class="cbx-h">C_' + n + '</div><div class="cbx-v">' + s.cHex + '</div></div>' +
       '<div class="cb-arr">↓</div>' +
@@ -559,7 +560,7 @@ document.getElementById('inputForm').addEventListener('submit', function(ev){
 });
 
 // Render awal
-renderAll('R', '11', 'universitas ahmad dahlan');
+renderAll('R', '1', 'universitas ahmad dahlan');
 </script>
 </body>
 </html>
