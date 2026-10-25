@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Animasi Perhitungan CBC (Cipher Block Chaining)</title>
+<style>
+  :root {
+    --bg:        #0b1020;
+    --panel:     #141a30;
+    --panel2:    #1a2140;
+    --border:    #2b3660;
+    --text:      #e8ecff;
+    --muted:     #9aa6d6;
+    --accent:    #6d9bff;
+    --accent2:   #35e0c0;
+    --warn:      #ffd166;
+    --cipher:    #ff7b9c;
+    --pt:        #4ade80;
+    --iv:        #f59e0b;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 800px at 20% -10%, #16204a, var(--bg));
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  header h1 { font-size: 26px; margin: 8px 0 4px; letter-spacing: .3px; }
+  header p  { color: var(--muted); margin: 0 0 20px; }
+  .tag {
+    display: inline-block; font-size: 12px; color: var(--accent2);
+    border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+    background: var(--panel2); letter-spacing: .5px; text-transform: uppercase;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .card h2 { margin: 0 0 12px; font-size: 17px; color: var(--accent); }
+
+  /* ===== CBC DIAGRAM ===== */
+  .cbcdiagram {
+    display:flex; flex-wrap:nowrap; gap:0; margin:6px 0 4px;
+    overflow-x:auto; padding-bottom:10px;
+  }
+  .cbccol {
+    display:flex; flex-direction:column; align-items:center;
+    min-width:130px; flex:0 0 auto; position:relative;
+    padding:0 10px;
+  }
+  .cbx {
+    width:130px; border-radius:10px; padding:8px 10px; text-align:center;
+    border:1px solid var(--border); background:var(--panel2); position:relative;
+    transition:.2s;
+  }
+  .cbx .cbx-h { font-size:11px; font-weight:700; letter-spacing:.3px; margin-bottom:3px; }
+  .cbx .cbx-v { font-family:var(--mono); font-size:11.5px; word-break:break-all; }
+  .cbx .cbx-t { font-size:10px; color:var(--muted); margin-top:3px; }
+  .cbx .cbx-v2 { font-family:var(--mono); font-size:10px; margin-top:3px; }
+  .cbx .cbx-k { color:var(--accent2); font-size:10px; }
+  .cbx.pt  { border-color:var(--pt); }    .cbx.pt .cbx-h{ color:var(--pt); }   .cbx.pt .cbx-v{ color:var(--pt); }
+  .cbx.xor { border-color:var(--warn); }  .cbx.xor .cbx-h{ color:var(--warn); }
+  .cbx.ct  { border-color:var(--cipher); }.cbx.ct .cbx-h{ color:var(--cipher); }.cbx.ct .cbx-v{ color:var(--cipher); }
+  .cbx.enc,.cbx.dec {
+    border-color:var(--accent2); background:linear-gradient(135deg,#162040,#1a2f4a);
+    cursor:pointer; box-shadow:0 4px 14px rgba(53,224,192,.15);
+  }
+  .cbx.enc .cbx-h,.cbx.dec .cbx-h { color:var(--accent2); font-size:13px; }
+  .cbx.enc:hover,.cbx.dec:hover,.cbx.enc.open,.cbx.dec.open {
+    border-color:var(--accent); box-shadow:0 8px 24px rgba(109,155,255,.35);
+    transform:translateY(-2px);
+  }
+  .cbx .detail {
+    display:none; margin-top:8px; padding:8px; border-top:1px dashed var(--border);
+    font-family:var(--mono); font-size:10px; line-height:1.8; text-align:left; color:var(--text);
+    background:rgba(13,18,38,.7); border-radius:0 0 8px 8px;
+  }
+  .cbx.open .detail { display:block; animation:fade .3s ease; }
+  .cbx .detail .lbl { color:var(--accent2); }
+  .cbx .hint2 { font-size:9px; color:var(--muted); margin-top:4px; }
+  .cb-arr {
+    font-size:14px; color:var(--accent); margin:2px 0; text-align:center;
+    width:100%;
+  }
+  .cbc-chain {
+    position:relative; min-width:46px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; flex:0 0 auto;
+  }
+  .cbc-chain span {
+    position:absolute; top:48%; font-size:10px; color:var(--cipher);
+    background:var(--panel); padding:1px 6px; border-radius:999px;
+    border:1px solid var(--border); letter-spacing:.3px; white-space:nowrap;
+  }
+  .cbc-dots {
+    display:flex; align-items:center; justify-content:center;
+    min-width:36px; flex:0 0 auto; font-size:22px; color:var(--accent);
+    font-family:var(--mono);
+  }
+  .cbc-ellipsis-col {
+    display:flex; flex-direction:column; align-items:center;
+    min-width:100px; flex:0 0 auto; padding:0 8px;
+  }
+  .cbc-ellipsis-col .cbx { width:100px; }
+  @keyframes fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+  @media (max-width:760px){ .cbcdiagram { flex-wrap:wrap; } .cbccol{ margin:8px 0; } }
+
+  /* ===== ALUR LOGIKA ===== */
+  .changelog { display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+  .cl-item { display:flex; gap:12px; align-items:flex-start;
+    border:1px solid var(--border); border-radius:10px; padding:10px 14px;
+    background:var(--panel2); }
+  .cl-item .cl-num {
+    font-family:var(--mono); font-size:18px; font-weight:700; color:var(--pt);
+    min-width:42px; text-align:center; }
+  .cl-item p { margin:0; font-size:13px; color:var(--text); line-height:1.7; }
+  .cl-item p b { color:var(--accent2); }
+
+  /* form */
+  form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  form .full { grid-column: 1 / -1; }
+  label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+    font-family: var(--mono); font-size: 14px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  .btn {
+    margin-top: 14px; width: 100%; padding: 12px; cursor: pointer;
+    border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #04122b;
+  }
+  .btn:active { transform: translateY(1px); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+  /* legend */
+  .legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; font-size:12px; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+
+  /* langkah animasi */
+  .step {
+    display: none;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 12px;
+    background: var(--panel2);
+    padding: 16px;
+    margin-bottom: 12px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  .step.show { display:block; opacity:1; transform: translateY(0); }
+  .step .head { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .step .head b { color: var(--accent2); }
+  .step p.desc { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+
+  .math {
+    background: #0d1226; border:1px solid var(--border); border-radius:10px;
+    padding: 12px; font-family: var(--mono); font-size: 13px; overflow-x:auto;
+    white-space: pre; color: var(--text);
+  }
+  .math .k  { color: var(--accent2); }
+  .math .p  { color: var(--pt); }
+  .math .c  { color: var(--cipher); }
+  .math .iv { color: var(--iv); }
+  .math .x  { color: var(--warn); }
+
+  /* tabel hasil */
+  table { width:100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px; text-align:left; border-bottom:1px solid var(--border); font-family: var(--mono); }
+  th { color: var(--accent); font-family: inherit; }
+  td.c { color: var(--cipher); }
+
+  /* kontrol play */
+  .controls { display:flex; gap:10px; margin-top: 8px; }
+  .ctrl {
+    flex:1; padding:11px; cursor:pointer; border-radius:10px; border:1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-weight:600; font-size:14px;
+  }
+  .ctrl.primary { background: linear-gradient(135deg,var(--accent),var(--accent2)); color:#04122b; border:none; }
+  .ctrl:disabled { opacity:.45; cursor:not-allowed; }
+
+  @media (max-width: 720px){ form { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="tag">Kriptografi</span>
+    <h1>Animasi Perhitungan CBC — <em>Cipher Block Chaining</em></h1>
+    <p>Kriptografi</p>
+  </header>
+
+  <!-- ===== INPUT ===== -->
+  <div class="card">
+    <h2>1 · Masukan (Key, IV, Plaintext)</h2>
+    <form id="inputForm">
+      <div>
+        <label>Key (cukup 1 huruf, contoh: R)</label>
+        <input id="inKey" value="R" maxlength="1" />
+      </div>
+      <div>
+        <label>IV (contoh: 11 / 00 — 1 byte)</label>
+        <input id="inIV" value="11" />
+      </div>
+      <div>
+        <label>Plaintext (kalimat bebas)</label>
+        <input id="inPT" value="universitas ahmad dahlan" />
+      </div>
+      <div class="full">
+        <button type="submit" class="btn">Hitung &amp; Ulangi Animasi →</button>
+        <p class="hint">
+          <b>Blok = 8 bit (1 byte)</b> sesuai pengajaran kriptografi dasar.<br>
+          <b>Key</b> = cukup <b>1 huruf</b> (mis. <em>R</em>) → kode ASCII menjadi kunci 8‑bit (1 byte).<br>
+          <b>IV</b> = 1 byte, contoh <code>11</code> (hex) atau <code>00</code> → menjadi C₀ (1 blok 8‑bit).<br>
+          <b>Plaintext</b> = setiap karakter = 1 blok 8‑bit. Maks 6 blok ditampilkan.
+        </p>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===== KUNCI & IV (penurunan) ===== -->
+  <div class="card" id="setupCard">
+    <h2>2 · Setup: Kunci &amp; IV (blok 8 bit, TIDAK pakai AES)</h2>
+    <div class="math" id="setupMath"></div>
+
+    <h3 style="margin:14px 0 6px;color:var(--accent2);font-size:14px">Kriptografi Blok 8‑bit yang Dipakai (bukan AES)</h3>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 10px">
+      Setiap blok <b>8 bit (1 byte)</b> dienkripsi sebagai <b>black-box E_K</b>:
+    </p>
+    <div class="math">C = E_K(m)   [m, K : 8 bit]
+<span style="color:var(--cipher)">→ keluaran C (8 bit) = Ciphertext blok</span>
+<span style="color:var(--muted);font-size:12px">D_K(C) = m  (kebalikan E_K)</span></div>
+    <p class="hint">Kunci K 8 bit = kode ASCII dari 1 huruf input (mis. "R" = 82 = 01010010). E_K &amp; D_K berupa kotak hitam — fokus pembelajaran ada pada aturan chaining CBC.</p>
+  </div>
+
+  <!-- ===== CBC DIAGRAM: ENCRYPTION ===== -->
+  <div class="card">
+    <h2>3 · Diagram CBC — Enkripsi</h2>
+    <p class="hint" style="margin:0 0 14px">
+      Klik/tekan <b>kotak Encrypt</b> untuk melihat kunci K yang dipakai.
+      Chaining: <b>Cᵢ</b> keluar dari blok ke‑n masuk ke blok ke‑(n+1) sebagai Cᵢ₋₁.
+    </p>
+    <div class="cbcdiagram" id="enc"></div>
+  </div>
+
+  <!-- ===== CBC DIAGRAM: DEKRIPSI ===== -->
+  <div class="card">
+    <h2>4 · Diagram CBC — Dekripsi</h2>
+    <p class="hint" style="margin:0 0 14px">
+      Kebalikan dari enkripsi: Cᵢ di‑dekripsi dulu, baru di‑XOR dengan Cᵢ₋₁
+      (untuk blok pertama di‑XOR dengan IV). Klik kotak <b>Decrypt</b> untuk melihat langkah baliknya.
+    </p>
+    <div class="cbcdiagram" id="dec"></div>
+  </div>
+
+  <!-- Legend -->
+  <div class="card">
+    <div class="legend">
+      <span><i class="dot" style="background:var(--pt)"></i> Plaintext (P)</span>
+      <span><i class="dot" style="background:var(--iv)"></i> IV / C sebelumnya</span>
+      <span><i class="dot" style="background:var(--warn)"></i> Hasil XOR</span>
+      <span><i class="dot" style="background:var(--cipher)"></i> Ciphertext (C)</span>
+      <span><i class="dot" style="background:var(--accent2)"></i> Kotak Encrypt/Decrypt (klik = rincian)</span>
+    </div>
+  </div>
+
+  <!-- ===== ALUR LOGIKA ENKRIPSI ===== -->
+  <div class="card">
+    <h2>5 · Alur Logika Enkripsi</h2>
+    <p style="color:var(--text);font-size:13.5px;line-height:1.8;margin:0 0 12px">
+      Proses selalu berjalan <b>dari kiri ke kanan</b> (P₁ sampai Pₙ).
+      Perhatikan panah pada diagram:
+    </p>
+    <div class="changelog">
+      <div class="cl-item"><span class="cl-num">P₁</span>
+        <p><b>Blok pertama:</b> P₁ di‑XOR dengan <b>IV</b> (karena belum ada blok sebelumnya).
+        Hasil XOR dimasukkan ke fungsi <b>Encrypt(K)</b>. Keluarnya <b>C₁</b>.</p></div>
+      <div class="cl-item"><span class="cl-num">P₂</span>
+        <p><b>Blok kedua:</b> P₂ di‑XOR dengan <b>C₁</b> (ciphertext blok sebelumnya, <b>bukan IV lagi</b>).
+        Hasil XOR di‑Encrypt(K) dengan kunci yang sama → <b>C₂</b>.</p></div>
+      <div class="cl-item"><span class="cl-num">P₃</span>
+        <p><b>Blok ketiga dst.:</b> Lakukan hal yang sama. P₃ di‑XOR dengan <b>C₂</b>, lalu di‑Encrypt(K), hasilnya <b>C₃</b>.
+        Pola ini berulang sampai Pₙ → Cₙ.</p></div>
+    </div>
+    <div class="math" style="margin-top:12px">
+<span class="k">P₁ ⊕ IV → E_K → C₁</span>
+<span class="k">P₂ ⊕ C₁ → E_K → C₂</span>
+<span class="k">P₃ ⊕ C₂ → E_K → C₃</span>
+<span class="k"> … </span>
+<span class="k">Pₙ ⊕ Cₙ₋₁ → E_K → Cₙ</span></div>
+  </div>
+
+  <!-- ===== LANGKAH ===== -->
+  <div class="card">
+    <h2>6 · Langkah Perhitungan (Animasi)</h2>
+    <div class="controls">
+      <button id="play"   class="ctrl primary">▶ Putar Animasi</button>
+      <button id="showAll" class="ctrl">Tampilkan Semua</button>
+      <button id="reset"   class="ctrl">Reset</button>
+    </div>
+  </div>
+
+  <div id="steps"></div>
+
+  <!-- ===== HASIL ===== -->
+  <div class="card" id="result" style="display:none">
+    <h2>7 · Hasil Ciphertext</h2>
+    <table>
+      <thead><tr><th>Blok</th><th>P (char)</th><th>P (8-bit)</th><th>XOR</th><th>Ciphertext C</th></tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+    <p class="hint" style="margin-top:12px">
+      Urutan ciphertext: <span id="cipherSeq" style="color:var(--cipher);font-family:var(--mono)"></span>
+    </p>
+  </div>
+</div>
+
+<script>
+// ================== UTILITAS ==================
+function b8(v){ return v.toString(2).padStart(8,'0'); }
+function toHex(v){ return v.toString(16).toUpperCase().padStart(2,'0'); }
+
+// E_K sebagai black-box: C = m XOR K
+function encryptBlock(m, K){ return m ^ K; }
+function decryptBlock(e, K){ return e ^ K; }
+
+// ================== HITUNG CBC ==================
+function computeCBC(key, iv, pt){
+  const K = key.length > 0 ? key.charCodeAt(0) : 0;
+  let ivHex = iv.toLowerCase().replace(/[^0-9a-f]/g,'');
+  ivHex = (ivHex || '00').padStart(2,'0').slice(0,2);
+  const IV = parseInt(ivHex, 16);
+
+  let padded = pt;
+  padded = padded.slice(0, 5) + String.fromCharCode(1); // PKCS7 pad 1 byte
+  padded = padded.slice(0, 6);
+  const blocks = padded.split('');
+
+  let prev = IV;
+  const steps = [];
+  for (let i = 0; i < blocks.length; i++){
+    const pVal = blocks[i].charCodeAt(0);
+    const ixVal = pVal ^ prev;
+    const cVal = encryptBlock(ixVal, K);
+    steps.push({
+      p: blocks[i], pVal, pHex: toHex(pVal),
+      prev, prevHex: toHex(prev),
+      ix: ixVal, ixHex: toHex(ixVal),
+      c: cVal, cHex: toHex(cVal),
+      K
+    });
+    prev = cVal;
+  }
+  return { K, ivHex, IV, steps, cipherHex: steps.map(s => s.cHex) };
+}
+
+// ================== RENDER ==================
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function renderAll(key, iv, pt){
+  const { K, ivHex, IV, steps, cipherHex } = computeCBC(key, iv, pt);
+  const isLast = steps.length - 1;
+
+  // ---- Setup ----
+  document.getElementById('setupMath').innerHTML =
+    '<span class="k">Key (input)</span> = "' + esc(key) + '"  <span style="color:var(--muted)">(1 huruf)</span><br>' +
+    '<span class="k">Kunci K</span>   = <span class="k">' + toHex(K) + '</span>  ' +
+    '<span style="color:var(--muted)">→ kode ASCII "' + esc(key[0]||'') + '" = ' + K + ' (biner ' + b8(K) + ')</span><br>' +
+    '<span style="color:var(--iv)">IV</span> = "' + esc(iv) + '"  →  <span class="iv">' + ivHex + '</span>  ' +
+    '<span style="color:var(--muted)">= C₀ (1 blok 8‑bit, nilai ' + IV + ')</span>';
+
+  // ---- Diagram Enkripsi ----
+  let encHtml = '';
+  steps.forEach((s, i) => {
+    const n = i + 1;
+    const isIv = (i === 0);
+    const prevLabel = isIv ? 'P₁ ⊕ IV' : 'P_' + n + ' ⊕ C_' + n;
+    const prevVal   = isIv ? 'IV = ' + ivHex + ' (=' + IV + ')' : 'C_' + n + ' = ' + s.prevHex + ' (=' + s.prev + ')';
+    encHtml += '<div class="cbccol" data-stage="' + n + '">' +
+      '<div class="cbx pt"><div class="cbx-h">P_' + n + '</div><div class="cbx-v">' + esc(s.p) + ' <span style="color:var(--muted)">= ' + s.pHex + '</span></div><div class="cbx-t">' + b8(s.pVal) + '</div></div>' +
+      '<div class="cb-arr">↓</div>' +
+      '<div class="cbx xor"><div class="cbx-h">⊕</div><div class="cbx-v">' + prevLabel + '</div><div class="cbx-t">' + prevVal + '</div><div class="cbx-v2" style="color:var(--warn)">XOR = ' + s.ixHex + ' (' + b8(s.ix) + ')</div></div>' +
+      '<div class="cb-arr">↓</div>' +
+      '<div class="cbx enc" onclick="toggleBox(this)" tabindex="0"><div class="cbx-h">Encrypt <span class="cbx-k">K</span></div><div class="cbx-v">E_K(XOR)</div>' +
+      '<div class="detail"><div class="lbl">K = ' + s.K + ' (' + b8(s.K) + ')</div>' +
+      '<div style="color:var(--cipher);margin-top:4px">C_' + n + ' = ' + s.cHex + '</div></div>' +
+      '<div class="hint2">klik untuk lihat kunci</div></div>' +
+      '<div class="cb-arr">↓</div>' +
+      '<div class="cbx ct"><div class="cbx-h">C_' + n + '</div><div class="cbx-v">' + s.cHex + '</div>' +
+      (i < isLast ? '<div class="cbx-t">→ chaining ke blok ' + (n+1) + '</div>' : '<div class="cbx-t">ciphertext akhir</div>') +
+      '</div></div>';
+    if (i < isLast) encHtml += '<div class="cbc-chain">C_' + n + '<span>chaining →</span>C_' + (n+1) + '</div>';
+  });
+  if (isLast > 0){
+    encHtml += '<div class="cbc-dots">⋯</div>' +
+      '<div class="cbc-ellipsis-col"><div class="cbx pt"><div class="cbx-h">P_n</div><div class="cbx-t">blok terakhir</div></div>' +
+      '<div class="cb-arr">↓</div><div class="cbx enc"><div class="cbx-h">Encrypt K</div></div>' +
+      '<div class="cb-arr">↓</div><div class="cbx ct"><div class="cbx-h">C_n</div><div class="cbx-t">= <span style="color:var(--cipher)">' + cipherHex[cipherHex.length-1] + '</span></div></div></div>';
+  }
+  document.getElementById('enc').innerHTML = encHtml;
+
+  // ---- Diagram Dekripsi ----
+  let decHtml = '';
+  steps.forEach((s, i) => {
+    const n = i + 1;
+    const isIv = (i === 0);
+    const xorLabel = isIv ? 'D_K(C₁) ⊕ IV' : 'D_K(C_' + n + ') ⊕ C_' + n;
+    const xorVal   = isIv ? 'IV = ' + ivHex + ' (' + IV + ')' : 'C_' + n + ' = ' + s.prevHex;
+    decHtml += '<div class="cbccol" data-stage="' + n + '">' +
+      '<div class="cbx ct"><div class="cbx-h">C_' + n + '</div><div class="cbx-v">' + s.cHex + '</div></div>' +
+      '<div class="cb-arr">↓</div>' +
+      '<div class="cbx dec" onclick="toggleBox(this)" tabindex="0"><div class="cbx-h">Decrypt <span class="cbx-k">K</span></div><div class="cbx-v">D_K(C_' + n + ')</div>' +
+      '<div class="detail"><div style="color:var(--muted)">Output D_K: ' + b8(s.c) + '</div>' +
+      '<div style="color:var(--muted)">K = ' + s.K + ' (' + b8(s.K) + ')</div></div>' +
+      '<div class="hint2">klik untuk rincian</div></div>' +
+      '<div class="cb-arr">↓</div>' +
+      '<div class="cbx xor"><div class="cbx-h">⊕</div><div class="cbx-v">' + xorLabel + '</div><div class="cbx-t">' + xorVal + '</div></div>' +
+      '<div class="cb-arr">↓</div>' +
+      '<div class="cbx pt"><div class="cbx-h">P_' + n + '</div><div class="cbx-v">' + esc(s.p) + ' <span style="color:var(--muted)">= ' + s.pHex + '</span></div><div class="cbx-t">' + b8(s.pVal) + '</div></div></div>';
+    if (i < isLast) decHtml += '<div class="cbc-chain">C_' + n + '<span>chaining →</span>C_' + (n+1) + '</div>';
+  });
+  if (isLast > 0){
+    decHtml += '<div class="cbc-dots">⋯</div>' +
+      '<div class="cbc-ellipsis-col"><div class="cbx ct"><div class="cbx-h">C_n</div></div>' +
+      '<div class="cb-arr">↓</div><div class="cbx dec"><div class="cbx-h">Decrypt K</div></div>' +
+      '<div class="cb-arr">↓</div><div class="cbx pt"><div class="cbx-h">P_n</div></div></div>';
+  }
+  document.getElementById('dec').innerHTML = decHtml;
+
+  // ---- Langkah per blok ----
+  let stepsHtml = '';
+  steps.forEach((s, i) => {
+    const n = i + 1;
+    const isIv = (i === 0);
+    const xorWith = isIv ? 'IV (C₀)' : 'C_' + (n-1);
+    const descIv = isIv
+      ? 'Blok pertama: P₁ di‑XOR dengan <b>IV</b> (karena belum ada blok sebelumnya). IV berperan sebagai "C₀".'
+      : 'Blok ke‑' + n + ': P_' + n + ' di‑XOR dengan <b>C_' + (n-1) + '</b> (ciphertext dari blok sebelumnya, <b>bukan IV lagi</b>). Inilah "chaining" pada CBC.';
+    stepsHtml +=
+    '<div class="step" data-step="' + (i*2) + '">' +
+      '<div class="head">Langkah ' + n + 'a · <b>P_' + n + ' ("' + esc(s.p) + '") XOR ' + xorWith + '</div>' +
+      '<p class="desc">Setiap blok = <b>8 bit (1 byte)</b>. ' + descIv +
+      ' Operasi XOR per‑bit: 1⊕0=1, 0⊕1=1, 1⊕1=0, 0⊕0=0.</p>' +
+      '<div class="math"><span class="x">P_' + n + '</span>   ' + b8(s.pVal) + '  (' + s.pVal + ')\n' +
+      '<span class="' + (isIv ? 'iv' : 'c') + '">' + (isIv ? 'C₀(IV)' : 'C_' + (n-1)) + '</span>  ' + b8(s.prev) + '  (' + s.prev + ')\n' +
+      '<span class="x">─────</span>    <span class="x">(XOR)</span>\n' +
+      '<span class="x">XOR  </span> ' + b8(s.ix) + '  → 0x' + s.ixHex + '  (' + s.ix + ')</div>' +
+    '</div>';
+
+    const isLastBlock = (i === steps.length - 1);
+    stepsHtml +=
+    '<div class="step" data-step="' + (i*2 + 1) + '">' +
+      '<div class="head">Langkah ' + n + 'b · <b>C_' + n + ' = E_K(XOR)</b> — Kriptografi Blok 8-bit</div>' +
+      '<p class="desc">Hasil XOR dienkripsi dengan <b>black-box E_K</b> (kriptografi blok 8-bit, bukan AES). ' +
+      (isLastBlock ? 'Inilah ciphertext terakhir (blok akhir).' : 'Ciphertext C_' + n + ' ini menjadi input chaining untuk blok berikutnya.') + '</p>' +
+      '<div class="math">input m  = <span class="x">' + s.ix + ' (' + b8(s.ix) + ')</span>\n' +
+      'Kunci K  = <span class="k">' + s.K + ' (' + b8(s.K) + ')</span>\n\n' +
+      'C = E_K(m)  = <span class="c">' + s.c + ' (' + b8(s.c) + ')</span>\n\n' +
+      '<span class="c">→ C_' + n + ' = ' + s.cHex + '</span>  (8 bit)</div>' +
+    '</div>';
+  });
+  document.getElementById('steps').innerHTML = stepsHtml;
+
+  // ---- Hasil ----
+  document.getElementById('resultBody').innerHTML =
+    steps.map((s, i) =>
+      '<tr><td>' + (i+1) + '</td><td>' + esc(s.p) + '</td><td>' + s.pHex + '</td><td>' + s.ixHex + '</td><td class="c">' + s.cHex + '</td></tr>'
+    ).join('');
+  document.getElementById('cipherSeq').textContent = cipherHex.join(' ');
+
+  // Tampilkan langkah pertama sebagai contoh
+  const firstStep = document.querySelector('.step');
+  if (firstStep) firstStep.classList.add('show');
+}
+
+// ================== KOTAK INTERAKTIF ==================
+function toggleBox(el){
+  el.classList.toggle('open');
+}
+document.addEventListener('keydown', function(ev){
+  if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.classList && ev.target.classList.contains('enc')) {
+    ev.preventDefault();
+    toggleBox(ev.target);
+  }
+});
+
+// ================== ANIMASI ==================
+const resultEl = document.getElementById('result');
+const playBtn   = document.getElementById('play');
+const showAllBtn= document.getElementById('showAll');
+const resetBtn  = document.getElementById('reset');
+let timer = null;
+
+function getSteps(){ return Array.from(document.querySelectorAll('.step')); }
+function hideAll(){
+  getSteps().forEach(s => s.classList.remove('show'));
+  resultEl.style.display = 'none';
+}
+function showOne(el){
+  el.classList.add('show');
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+function stop(){ if(timer){ clearInterval(timer); timer=null; playBtn.disabled=false; } }
+
+function play(){
+  stop();
+  hideAll();
+  const seq = getSteps();
+  let i = 0;
+  playBtn.disabled = true;
+  timer = setInterval(() => {
+    if (i < seq.length){ showOne(seq[i]); i++; }
+    else {
+      stop();
+      resultEl.style.display = 'block';
+      resultEl.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  }, 1900);
+}
+function showAll(){
+  stop();
+  getSteps().forEach(s => s.classList.add('show'));
+  resultEl.style.display = 'block';
+}
+function resetAll(){
+  stop();
+  hideAll();
+  playBtn.disabled = false;
+}
+playBtn.addEventListener('click', play);
+showAllBtn.addEventListener('click', showAll);
+resetBtn.addEventListener('click', resetAll);
+
+// ================== FORM ==================
+document.getElementById('inputForm').addEventListener('submit', function(ev){
+  ev.preventDefault();
+  const key = document.getElementById('inKey').value.trim();
+  const iv  = document.getElementById('inIV').value.trim();
+  const pt  = document.getElementById('inPT').value.trim();
+  renderAll(key, iv, pt);
+  this.scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+// Render awal
+renderAll('R', '11', 'universitas ahmad dahlan');
+</script>
+</body>
+</html>
