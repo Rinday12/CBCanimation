@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "use": "@vercel/php",
+      "src": "*.php"
+    },
+    {
+      "use": "@vercel/static",
+      "src": "**/*.{html,css,js,svg,png,jpg,jpeg,woff,woff2,ico}"
+    }
+  ],
+  "routes": [
+    { "src": "/index.php", "dest": "/index.php" },
+    { "src": "/(.*)", "dest": "/index.php" }
+  ]
+}
